@@ -1,0 +1,435 @@
+/* Стили для страницы отопления */
+.page-banner {
+    background: linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%);
+    color: white;
+    padding: 60px 0;
+    text-align: center;
+    margin-bottom: 40px;
+    border-radius: 0 0 30px 30px;
+    box-shadow: 0 10px 30px rgba(30, 58, 138, 0.2);
+}
+
+.page-banner h1 {
+    font-size: 2.8rem;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
+
+.page-banner p {
+    font-size: 1.2rem;
+    opacity: 0.95;
+}
+
+.main-categories-tabs {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.main-category-tab {
+    padding: 15px 30px;
+    background: white;
+    border: 2px solid #DBEAFE;
+    border-radius: 50px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #1E3A8A;
+    transition: all 0.3s;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.main-category-tab:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(30, 58, 138, 0.15);
+    border-color: #3B82F6;
+}
+
+.main-category-tab.active {
+    background: linear-gradient(135deg, #1E40AF, #3B82F6);
+    color: white;
+    border-color: transparent;
+}
+
+.category-section {
+    display: none;
+    margin-bottom: 50px;
+}
+
+.category-section.active {
+    display: block;
+}
+
+.category-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.category-header h2 {
+    color: #1E3A8A;
+    font-size: 2rem;
+    margin: 0;
+}
+
+.category-header i {
+    font-size: 2rem;
+    color: #3B82F6;
+}
+
+.subcategories-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid #E2E8F0;
+    padding-bottom: 15px;
+}
+
+.subcategory-tab {
+    padding: 10px 20px;
+    background: #f1f5f9;
+    border: none;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #475569;
+    transition: all 0.3s;
+}
+
+.subcategory-tab:hover {
+    background: #DBEAFE;
+    color: #1E3A8A;
+}
+
+.subcategory-tab.active {
+    background: linear-gradient(135deg, #3B82F6, #2563EB);
+    color: white;
+}
+
+.height-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.height-tab {
+    padding: 8px 16px;
+    background: white;
+    border: 1px solid #CBD5E1;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+}
+
+.height-tab:hover {
+    border-color: #3B82F6;
+    background: #EFF6FF;
+}
+
+.height-tab.active {
+    background: #3B82F6;
+    color: white;
+    border-color: #3B82F6;
+}
+
+.subcategory-section {
+    display: none;
+}
+
+.subcategory-section.active {
+    display: block;
+}
+
+.height-section {
+    display: none;
+}
+
+.height-section.active {
+    display: block;
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 25px;
+    margin-top: 20px;
+}
+
+.product-card {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    transition: all 0.4s;
+    border: 2px solid #E2E8F0;
+    position: relative;
+}
+
+.product-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(30, 58, 138, 0.15);
+    border-color: #3B82F6;
+}
+
+.product-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: #EF4444;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    z-index: 1;
+}
+
+.product-badge.popular {
+    background: #F59E0B;
+}
+
+.product-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    transition: transform 0.5s;
+}
+
+.product-card:hover img {
+    transform: scale(1.05);
+}
+
+.product-card h4 {
+    color: #1E3A8A;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.product-card p {
+    color: #64748B;
+    font-size: 0.9rem;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.price {
+    color: #EF4444;
+    font-size: 1.4rem;
+    font-weight: 800;
+    margin-bottom: 15px;
+}
+
+.price small {
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: #64748B;
+}
+
+.section-price {
+    font-size: 0.85rem;
+    color: #64748B;
+    margin-top: 5px;
+}
+
+.add-to-cart-btn {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #10B981, #34D399);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.add-to-cart-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+}
+
+.empty-products {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 60px;
+    background: white;
+    border-radius: 20px;
+    color: #64748B;
+}
+
+.empty-products i {
+    font-size: 4rem;
+    color: #CBD5E1;
+    margin-bottom: 20px;
+}
+
+.quantity-control {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: #F8FAFC;
+    border-radius: 50px;
+    padding: 5px 10px;
+    margin: 12px 0;
+    border: 1px solid #E2E8F0;
+}
+
+.quantity-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: white;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    font-weight: bold;
+    cursor: pointer;
+    color: #1E3A8A;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.quantity-btn:hover {
+    background: linear-gradient(135deg, #1E40AF, #3B82F6);
+    color: white;
+}
+
+.quantity-input {
+    width: 55px;
+    padding: 8px 0;
+    text-align: center;
+    border: 1px solid #E2E8F0;
+    border-radius: 30px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1E3A8A;
+}
+
+.quantity-unit {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #64748B;
+    min-width: 45px;
+}
+
+body.heating-page {
+    background-image: url('../img/heating-bg.jpg');
+    background-size: cover;
+    background-attachment: fixed;
+    background-position: center;
+    position: relative;
+}
+
+body.heating-page::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.88);
+    z-index: -1;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+    .products-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px !important;
+    }
+    .product-card {
+        padding: 12px !important;
+    }
+    .product-card img {
+        height: 120px !important;
+    }
+    .product-card h4 {
+        font-size: 0.85rem !important;
+    }
+    .product-card p {
+        display: none;
+    }
+    .price {
+        font-size: 1rem !important;
+    }
+    .quantity-btn {
+        width: 28px !important;
+        height: 28px !important;
+        font-size: 0.9rem !important;
+    }
+    .quantity-input {
+        width: 42px !important;
+        font-size: 0.75rem !important;
+    }
+    .add-to-cart-btn {
+        padding: 8px !important;
+        font-size: 0.7rem !important;
+    }
+    .page-banner h1 {
+        font-size: 2rem;
+    }
+    .page-banner p {
+        font-size: 1rem;
+    }
+    .main-category-tab {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+    .category-header h2 {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 10px !important;
+    }
+    .product-card img {
+        height: 100px !important;
+    }
+    .main-category-tab {
+        padding: 8px 15px;
+        font-size: 0.8rem;
+        flex: 1 0 calc(50% - 10px);
+        text-align: center;
+        justify-content: center;
+    }
+    .subcategory-tab {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    .page-banner {
+        padding: 30px 0;
+    }
+    .page-banner h1 {
+        font-size: 1.5rem;
+    }
+}
