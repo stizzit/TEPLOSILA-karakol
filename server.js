@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ===== НАСТРОЙКИ =====
-const TELEGRAM_TOKEN = '8564447444:AAGL_DfOSI6gLvWo27Rq5_w20QRf0r6Yi9Q';
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const ADMIN_CHAT_ID = '1219777106';
 const ADMIN_PASSWORD = 'admin123';
 
