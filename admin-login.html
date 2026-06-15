@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Админ-панель | ТЕПЛОСИЛА</title>
+    <link rel="stylesheet" href="css/admin-login.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<div class="admin-bg">
+    <div class="grid-lines"></div>
+    <div class="scan-line"></div>
+    <i class="fas fa-cog gear gear1"></i>
+    <i class="fas fa-cog gear gear2"></i>
+    <i class="fas fa-cog gear gear3"></i>
+    <i class="fas fa-shield-alt floating-shield"></i>
+    <i class="fas fa-microchip floating-chip"></i>
+    <div class="security-dots"></div>
+</div>
+
+<div class="login-card" id="loginCard">
+    <div class="login-logo">
+        <i class="fas fa-fire"></i>
+        <h2>ТЕПЛОСИЛА</h2>
+        <p>🔐 Административная панель</p>
+    </div>
+
+    <div id="errorMessage" class="error-message">
+        <i class="fas fa-exclamation-triangle"></i> <span id="errorText">Неверный пароль доступа</span>
+    </div>
+
+    <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+            <label><i class="fas fa-key"></i> Ключ доступа</label>
+            <div class="password-wrapper">
+                <input type="password" id="adminPassword" placeholder="Введите пароль" autocomplete="new-password" value="">
+                <button type="button" class="toggle-password" id="togglePasswordBtn">
+                    <i class="far fa-eye-slash"></i>
+                </button>
+            </div>
+        </div>
+        <button type="submit" class="login-btn">
+            <i class="fas fa-sign-in-alt"></i> <span>Войти в систему</span>
+        </button>
+    </form>
+
+    <div class="back-link">
+        <a href="index.html"><i class="fas fa-arrow-left"></i> Вернуться на главную</a>
+    </div>
+    <div class="security-note">
+        <p><i class="fas fa-shield-alt"></i> Безопасное соединение</p>
+    </div>
+</div>
+
+<script src="js/admin-login.js"></script>
+</body>
+</html>

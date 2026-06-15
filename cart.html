@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Корзина - ТЕПЛОСИЛА</title>
+    <link rel="icon" type="image/jpeg" href="logo/logo-2.jpg">
+    <link rel="stylesheet" href="css/cart.css">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container header-row">
+            <div class="logo-container">
+                <img src="logo/logo.jpg" alt="Логотип" class="logo" onerror="this.src='img/default.jpg'">
+                <div class="logo-text">
+                    <h1>ТЕПЛОСИЛА</h1>
+                    <p>Отопление и сантехника</p>
+                </div>
+            </div>
+            <nav class="desktop-nav">
+                <ul>
+                    <li><a href="index.html">Главная</a></li>
+                    <li><a href="heating.html">Отопление</a></li>
+                    <li><a href="plumbing.html">Сантехника</a></li>
+                    <li><a href="cart.html" class="cart-link active">Корзина <i class="fas fa-shopping-cart"></i> <span class="cart-count">0</span></a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="cart-container">
+        <h1 class="cart-title"><i class="fas fa-shopping-cart"></i> Корзина</h1>
+        <div id="cartContent"></div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 ТЕПЛОСИЛА. Все права защищены.</p>
+                <a href="admin-login.html" class="admin-secret-link"><i class="fas fa-user-shield"></i> Админ-панель</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/cart.js"></script>
+</body>
+</html>

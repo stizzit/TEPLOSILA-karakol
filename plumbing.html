@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Сантехника - ТЕПЛОСИЛА</title>
+    <link rel="icon" type="image/jpeg" href="logo/logo-2.jpg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/plumbing.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="plumbing-page">
+    <header>
+        <div class="container header-row">
+            <button class="mobile-menu-toggle" id="mobileMenuToggle"><i class="fas fa-bars"></i></button>
+            <div class="logo-container">
+                <img src="logo/logo.jpg" alt="Логотип" class="logo" onerror="this.src='img/default.jpg';">
+                <div class="logo-text"><h1>ТЕПЛОСИЛА</h1><p>Сантехника</p></div>
+            </div>
+            <div class="search-wrapper">
+                <div class="search-container">
+                    <input type="text" id="globalSearchInput" class="global-search-input" placeholder="Поиск...">
+                    <button id="globalSearchBtn" class="global-search-btn"><i class="fas fa-search"></i></button>
+                </div>
+            </div>
+            <nav class="desktop-nav">
+                <ul>
+                    <li><a href="index.html">Главная</a></li>
+                    <li><a href="heating.html">Отопление</a></li>
+                    <li><a href="plumbing.html" class="active">Сантехника</a></li>
+                    <li><a href="index.html#services">Услуги</a></li>
+                    <li><a href="index.html#about">О нас</a></li>
+                    <li><a href="index.html#contacts">Контакты</a></li>
+                    <li><a href="cart.html" class="cart-link"><i class="fas fa-shopping-cart"></i> <span class="cart-count">0</span></a></li>
+                </ul>
+            </nav>
+        </div>
+        <div class="mobile-menu" id="mobileMenu">
+            <div class="mobile-menu-header">
+                <div class="logo-container"><img src="logo/logo.jpg" alt="ТЕПЛОСИЛА" class="logo"><h3 style="color:white;">ТЕПЛОСИЛА</h3></div>
+                <button class="mobile-menu-close" id="mobileMenuClose">&times;</button>
+            </div>
+            <ul class="mobile-menu-list">
+                <li><a href="index.html">Главная</a></li>
+                <li><a href="heating.html">Отопление</a></li>
+                <li><a href="plumbing.html">Сантехника</a></li>
+                <li><a href="index.html#services">Услуги</a></li>
+                <li><a href="index.html#about">О нас</a></li>
+                <li><a href="index.html#contacts">Контакты</a></li>
+                <li class="menu-divider"></li>
+                <li><a href="cart.html">Корзина <span class="cart-count">0</span></a></li>
+                <li><a href="admin-login.html">Админ-панель</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <section class="page-banner">
+        <div class="container">
+            <h1><i class="fas fa-faucet"></i> Сантехника</h1>
+            <p>Трубы, фитинги, смесители и насосы</p>
+        </div>
+    </section>
+
+    <div class="container">
+        <div class="main-categories-tabs">
+            <div class="main-category-tab active" data-category="truby"><i class="fas fa-grip-lines"></i> Трубы</div>
+            <div class="main-category-tab" data-category="fitingi"><i class="fas fa-link"></i> Фитинги</div>
+            <div class="main-category-tab" data-category="smesiteli"><i class="fas fa-faucet"></i> Смесители</div>
+            <div class="main-category-tab" data-category="nasosy"><i class="fas fa-water"></i> Насосы</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Трубы -->
+        <div id="truby" class="category-section active">
+            <div class="category-header"><i class="fas fa-grip-lines"></i><h2>Трубы</h2></div>
+            <div class="subcategories-tabs">
+                <button class="subcategory-tab active" data-category="truby" data-subcategory="ppr">ППР трубы</button>
+                <button class="subcategory-tab" data-category="truby" data-subcategory="pvc">ПВХ трубы</button>
+                <button class="subcategory-tab" data-category="truby" data-subcategory="metalplastic">Металлопластиковые</button>
+                <button class="subcategory-tab" data-category="truby" data-subcategory="kanalizacia">Канализация</button>
+            </div>
+            <div id="truby-ppr" class="subcategory-section active"><div class="products-grid" id="ppr-products"></div></div>
+            <div id="truby-pvc" class="subcategory-section"><div class="products-grid" id="pvc-products"></div></div>
+            <div id="truby-metalplastic" class="subcategory-section"><div class="products-grid" id="metalplastic-products"></div></div>
+            <div id="truby-kanalizacia" class="subcategory-section"><div class="products-grid" id="kanalizacia-products"></div></div>
+        </div>
+
+        <!-- Фитинги -->
+        <div id="fitingi" class="category-section">
+            <div class="category-header"><i class="fas fa-link"></i><h2>Фитинги</h2></div>
+            <div class="subcategories-tabs">
+                <button class="subcategory-tab active" data-category="fitingi" data-subcategory="connectors">Соединительные элементы</button>
+                <button class="subcategory-tab" data-category="fitingi" data-subcategory="krany">Краны</button>
+                <button class="subcategory-tab" data-category="fitingi" data-subcategory="other">Прочие</button>
+            </div>
+            <div id="fitingi-connectors" class="subcategory-section active"><div class="products-grid" id="connectors-products"></div></div>
+            <div id="fitingi-krany" class="subcategory-section"><div class="products-grid" id="krany-products"></div></div>
+            <div id="fitingi-other" class="subcategory-section"><div class="products-grid" id="other-products"></div></div>
+        </div>
+
+        <!-- Смесители -->
+        <div id="smesiteli" class="category-section">
+            <div class="category-header"><i class="fas fa-faucet"></i><h2>Смесители</h2></div>
+            <div class="subcategories-tabs">
+                <button class="subcategory-tab active" data-category="smesiteli" data-subcategory="rakovina">Для раковины</button>
+                <button class="subcategory-tab" data-category="smesiteli" data-subcategory="kuhnya">Для кухни</button>
+                <button class="subcategory-tab" data-category="smesiteli" data-subcategory="vanna">Для ванной</button>
+                <button class="subcategory-tab" data-category="smesiteli" data-subcategory="dush">Для душа</button>
+            </div>
+            <div id="smesiteli-rakovina" class="subcategory-section active"><div class="products-grid" id="rakovina-products"></div></div>
+            <div id="smesiteli-kuhnya" class="subcategory-section"><div class="products-grid" id="kuhnya-products"></div></div>
+            <div id="smesiteli-vanna" class="subcategory-section"><div class="products-grid" id="vanna-products"></div></div>
+            <div id="smesiteli-dush" class="subcategory-section"><div class="products-grid" id="dush-products"></div></div>
+        </div>
+
+        <!-- Насосы -->
+        <div id="nasosy" class="category-section">
+            <div class="category-header"><i class="fas fa-water"></i><h2>Насосы</h2></div>
+            <div class="subcategories-tabs">
+                <button class="subcategory-tab active" data-category="nasosy" data-subcategory="drenazhnye">Дренажные</button>
+                <button class="subcategory-tab" data-category="nasosy" data-subcategory="povysitelnye">Повысительные</button>
+                <button class="subcategory-tab" data-category="nasosy" data-subcategory="glubinnye">Глубинные</button>
+                <button class="subcategory-tab" data-category="nasosy" data-subcategory="cirkulyacionnye">Циркуляционные</button>
+            </div>
+            <div id="nasosy-drenazhnye" class="subcategory-section active"><div class="products-grid" id="drenazhnye-products"></div></div>
+            <div id="nasosy-povysitelnye" class="subcategory-section"><div class="products-grid" id="povysitelnye-products"></div></div>
+            <div id="nasosy-glubinnye" class="subcategory-section"><div class="products-grid" id="glubinnye-products"></div></div>
+            <div id="nasosy-cirkulyacionnye" class="subcategory-section"><div class="products-grid" id="cirkulyacionnye-products"></div></div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 ТЕПЛОСИЛА. Все права защищены.</p>
+                <a href="admin-login.html" class="admin-secret-link"><i class="fas fa-user-shield"></i> Админ-панель</a>
+            </div>
+        </div>
+    </footer>
+
+    <a href="cart.html" class="fixed-cart-btn"><i class="fas fa-shopping-cart"></i><span class="cart-count">0</span></a>
+
+    <script src="js/plumbing.js"></script>
+</body>
+</html>

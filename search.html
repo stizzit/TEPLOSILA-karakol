@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск - ТЕПЛОСИЛА</title>
+    <link rel="icon" type="image/jpeg" href="logo/logo-2.jpg">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/search.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container header-row">
+            <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo-container">
+                <img src="logo/logo.jpg" alt="Логотип" class="logo" onerror="this.onerror=null; this.src='img/default.jpg';">
+                <div class="logo-text">
+                    <h1>ТЕПЛОСИЛА</h1>
+                    <p>Отопление и сантехника</p>
+                </div>
+            </div>
+            <div class="search-wrapper">
+                <div class="search-container">
+                    <input type="text" id="globalSearchInput" class="global-search-input" placeholder="Поиск товаров...">
+                    <button class="global-search-btn" id="globalSearchBtn">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <nav class="desktop-nav">
+                <ul>
+                    <li><a href="index.html">Главная</a></li>
+                    <li><a href="heating.html">Отопление</a></li>
+                    <li><a href="plumbing.html">Сантехника</a></li>
+                    <li><a href="index.html#services">Услуги</a></li>
+                    <li><a href="index.html#about">О нас</a></li>
+                    <li><a href="index.html#contacts">Контакты</a></li>
+                    <li><a href="cart.html" class="cart-link"><i class="fas fa-shopping-cart"></i> <span class="cart-count">0</span></a></li>
+                </ul>
+            </nav>
+        </div>
+        
+        <div class="mobile-menu" id="mobileMenu">
+            <div class="mobile-menu-header">
+                <h3>Меню</h3>
+                <button class="mobile-menu-close" id="mobileMenuClose">&times;</button>
+            </div>
+            <ul class="mobile-menu-list">
+                <li><a href="index.html"><i class="fas fa-home"></i> Главная</a></li>
+                <li><a href="heating.html"><i class="fas fa-fire"></i> Отопление</a></li>
+                <li><a href="plumbing.html"><i class="fas fa-faucet"></i> Сантехника</a></li>
+                <li><a href="index.html#services"><i class="fas fa-tools"></i> Услуги</a></li>
+                <li><a href="index.html#about"><i class="fas fa-info-circle"></i> О нас</a></li>
+                <li><a href="index.html#contacts"><i class="fas fa-phone"></i> Контакты</a></li>
+                <li class="menu-divider"></li>
+                <li><a href="cart.html"><i class="fas fa-shopping-cart"></i> Корзина <span class="cart-count">0</span></a></li>
+                <li><a href="admin-login.html"><i class="fas fa-cog"></i> Админ-панель</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="search-results-container">
+        <div class="search-header">
+            <h1 class="search-title">🔍 Результаты поиска</h1>
+            <div class="search-box-large">
+                <input type="text" id="searchInputLarge" placeholder="Поиск по названию, цене, категории...">
+                <button id="searchBtnLarge"><i class="fas fa-search"></i></button>
+            </div>
+            <p class="search-count" id="searchCount"></p>
+        </div>
+        
+        <div class="products-grid" id="searchResults">
+            <!-- Результаты поиска -->
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 ТЕПЛОСИЛА. Все права защищены.</p>
+                <a href="admin-login.html" class="admin-secret-link"><i class="fas fa-user-shield"></i> Админ-панель</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/search.js"></script>
+</body>
+</html>
