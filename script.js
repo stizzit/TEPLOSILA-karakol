@@ -2,11 +2,16 @@
 
 // ===== API URL (скрыт) =====
 const API_URL = (() => {
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // На Render используем относительные пути (API на том же домене)
+    if (window.location.hostname === 'teplosila-karakol.onrender.com') {
+        return '/api';  // Относительный путь - будет работать на любом домене
+    }
+    // Локальная разработка
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
         return 'http://localhost:3000/api';
     }
-    return `http://${hostname}:3000/api`;
+    // Для других случаев (если сервер на том же домене)
+    return '/api';
 })();
 
 // ===== КОРЗИНА =====
