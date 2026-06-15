@@ -4,9 +4,8 @@ const API_URL = (() => {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return 'http://localhost:3000/api';
     }
-    return `http://${hostname}:3000/api`;
+    return '/api';
 })();
-
 // Корзина
 let cart = { items: [], total: 0, count: 0 };
 
