@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 // ===== НАСТРОЙКИ =====
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const ADMIN_CHAT_ID = '1219777106';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin333';
 
 function getLocalIp() {
     const { networkInterfaces } = require('os');
