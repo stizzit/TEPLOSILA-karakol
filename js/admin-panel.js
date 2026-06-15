@@ -4,9 +4,8 @@ const API_URL = (() => {
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return `http://${hostname}:3000/api`;
     }
-    return `http://${hostname}:3000/api`;
+    return '/api';
 })();
-
 let currentProductId = null;
 
 // ===== ТАБЫ ДЛЯ СЕКЦИЙ =====
