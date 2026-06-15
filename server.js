@@ -14,6 +14,16 @@ const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const ADMIN_CHAT_ID = '1219777106';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin333';
 
+// Глобальная обработка ошибок (чтобы сервер не падал)
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err.message);
+    // Не даём процессу упасть
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Unhandled Rejection:', reason);
+});
+
 function getLocalIp() {
     const { networkInterfaces } = require('os');
     const nets = networkInterfaces();
@@ -55,6 +65,16 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.static(__dirname));
 app.use('/uploads', express.static('uploads'));
 app.use('/img', express.static('img'));
+
+// Health check для Render (ОЧЕНЬ ВАЖНО!)
+app.get('/health', (req, res) => {
+    db.get("SELECT 1", (err) => {
+        if (err) {
+            return res.status(500).json({ status: 'unhealthy', error: err.message });
+        }
+        res.status(200).json({ status: 'healthy', timestamp: new Date().toISOString() });
+    });
+});
 
 // Обработка отсутствующих изображений
 app.get('/img/:filename', (req, res) => {
@@ -164,20 +184,336 @@ db.serialize(() => {
     });
 });
 
-// ===== TELEGRAM БОТ =====
-const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+// ===== TELEGRAM БОТ (с переподключением) =====
+let bot = null;
+let isBotRunning = false;
 
-bot.deleteWebHook().then(() => {
-    console.log('✅ Telegram бот запущен (polling mode)');
-}).catch(err => console.log('⚠️ Ошибка:', err.message));
+async function initBot() {
+    if (!TELEGRAM_TOKEN) {
+        console.log('⚠️ TELEGRAM_TOKEN не установлен, бот не запущен');
+        return;
+    }
+    
+    if (isBotRunning) return;
+    
+    try {
+        bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+        
+        // Обработка ошибок бота
+        bot.on('polling_error', (err) => {
+            console.error('⚠️ Telegram polling error:', err.message);
+            isBotRunning = false;
+            setTimeout(initBot, 10000); // Переподключение через 10 секунд
+        });
+        
+        bot.on('webhook_error', (err) => {
+            console.error('⚠️ Telegram webhook error:', err.message);
+        });
+        
+        await bot.deleteWebHook();
+        isBotRunning = true;
+        console.log('✅ Telegram бот запущен');
+        
+        const botInfo = await bot.getMe();
+        console.log('🤖 Бот активен:', botInfo.username);
+        
+        // Регистрируем обработчики (они уже определены ниже)
+        registerBotHandlers();
+        
+    } catch (err) {
+        console.error('❌ Ошибка запуска бота:', err.message);
+        isBotRunning = false;
+        setTimeout(initBot, 15000); // Повторная попытка через 15 секунд
+    }
+}
 
-bot.getMe().then((botInfo) => {
-    console.log('🤖 Бот активен:', botInfo.username);
-}).catch((err) => {
-    console.error('❌ Ошибка бота:', err.message);
-});
+function registerBotHandlers() {
+    if (!bot) return;
+    
+    bot.onText(/\/start/, async (msg) => {
+        const chatId = msg.chat.id;
+        console.log(`📱 /start от ${chatId}`);
+        
+        await registerUser(chatId, msg.chat.username, msg.chat.first_name, msg.chat.last_name);
+        const user = await getUser(chatId);
+        
+        if (!user) {
+            return sendToTelegram(chatId, `⛔ Нет доступа\nВаш ID: ${chatId}\nПередайте ID администратору.`);
+        }
+        
+        const isAdmin = user.role === 'admin';
+        const name = user.first_name || 'пользователь';
+        
+        const keyboard = isAdmin ? [
+            [{ text: '📋 ВСЕ ЗАКАЗЫ' }],
+            [{ text: '✅ ГОТОВЫ К ВЫДАЧЕ' }],
+            [{ text: '📊 СТАТИСТИКА' }, { text: '👥 СОТРУДНИКИ' }],
+            [{ text: '📋 ЗАЯВКИ' }]
+        ] : [
+            [{ text: '📋 ДОСТУПНЫЕ ЗАКАЗЫ' }],
+            [{ text: '👤 МОИ ЗАКАЗЫ' }]
+        ];
+        
+        sendToTelegram(chatId, `👋 Добро пожаловать, ${name}!`, {
+            reply_markup: { keyboard, resize_keyboard: true }
+        });
+    });
+    
+    bot.on('message', async (msg) => {
+        if (msg.text && msg.text.startsWith('/')) return;
+        
+        const chatId = msg.chat.id;
+        const text = msg.text;
+        if (!text) return;
+        
+        const user = await getUser(chatId);
+        if (!user) return;
+        
+        const isAdmin = user.role === 'admin';
+        
+        if (text === '📋 ДОСТУПНЫЕ ЗАКАЗЫ' && !isAdmin) {
+            db.all("SELECT * FROM orders WHERE status IN ('new', 'processing') AND (assigned_to IS NULL OR assigned_to = ?) ORDER BY created_at DESC LIMIT 10", [String(chatId)], async (err, orders) => {
+                if (!orders || orders.length === 0) return sendToTelegram(chatId, '📭 Нет доступных заказов');
+                sendToTelegram(chatId, `📋 ДОСТУПНЫЕ ЗАКАЗЫ (${orders.length})`);
+                for (const order of orders) {
+                    const message = formatOrderMessage(order);
+                    const buttons = [];
+                    if (order.status === 'new' && !order.assigned_to) buttons.push([{ text: '👤 ВЗЯТЬ', callback_data: `take_${order.id}` }]);
+                    else if (order.status === 'new' && order.assigned_to === String(chatId)) buttons.push([{ text: '✅ ПОДТВЕРДИТЬ', callback_data: `confirm_${order.id}` }]);
+                    else if (order.status === 'processing' && order.assigned_to === String(chatId)) buttons.push([{ text: '📦 ГОТОВ', callback_data: `ready_${order.id}` }]);
+                    await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
+                }
+            });
+        }
+        else if (text === '👤 МОИ ЗАКАЗЫ' && !isAdmin) {
+            db.all("SELECT * FROM orders WHERE assigned_to = ? AND status IN ('new', 'processing', 'ready') ORDER BY created_at DESC", [String(chatId)], async (err, orders) => {
+                if (!orders || orders.length === 0) return sendToTelegram(chatId, '📭 У вас нет активных заказов');
+                sendToTelegram(chatId, `👤 ВАШИ ЗАКАЗЫ (${orders.length})`);
+                for (const order of orders) {
+                    const message = formatOrderMessage(order);
+                    const buttons = [];
+                    if (order.status === 'new') buttons.push([{ text: '✅ ПОДТВЕРДИТЬ', callback_data: `confirm_${order.id}` }]);
+                    else if (order.status === 'processing') buttons.push([{ text: '📦 ГОТОВ', callback_data: `ready_${order.id}` }]);
+                    await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
+                }
+            });
+        }
+        else if (text === '📋 ВСЕ ЗАКАЗЫ' && isAdmin) {
+            db.all("SELECT * FROM orders WHERE status IN ('new', 'processing', 'ready') ORDER BY created_at DESC LIMIT 20", async (err, orders) => {
+                if (!orders || orders.length === 0) return sendToTelegram(chatId, '📭 Нет активных заказов');
+                sendToTelegram(chatId, `📋 ВСЕ АКТИВНЫЕ ЗАКАЗЫ (${orders.length})`);
+                for (const order of orders) {
+                    const message = formatOrderMessage(order);
+                    const buttons = [];
+                    if (order.status === 'ready') buttons.push([{ text: '✅ ВЫДАТЬ', callback_data: `deliver_${order.id}` }]);
+                    if (order.status !== 'delivered' && order.status !== 'cancelled') buttons.push([{ text: '❌ ОТМЕНИТЬ', callback_data: `cancel_${order.id}` }]);
+                    await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
+                }
+            });
+        }
+        else if (text === '✅ ГОТОВЫ К ВЫДАЧЕ' && isAdmin) {
+            db.all("SELECT * FROM orders WHERE status = 'ready' ORDER BY ready_at ASC", async (err, orders) => {
+                if (!orders || orders.length === 0) return sendToTelegram(chatId, '✅ Нет готовых заказов');
+                sendToTelegram(chatId, `✅ ГОТОВЫ К ВЫДАЧЕ (${orders.length})`);
+                for (const order of orders) {
+                    const message = formatOrderMessage(order);
+                    const buttons = [[{ text: '✅ ВЫДАТЬ', callback_data: `deliver_${order.id}` }], [{ text: '❌ ОТМЕНИТЬ', callback_data: `cancel_${order.id}` }]];
+                    await sendToTelegram(chatId, message, { reply_markup: { inline_keyboard: buttons } });
+                }
+            });
+        }
+        else if (text === '📊 СТАТИСТИКА' && isAdmin) {
+            db.get("SELECT COUNT(*) as products FROM products", (err, p) => {
+                db.get("SELECT COUNT(*) as new FROM orders WHERE status='new'", (err, n) => {
+                    db.get("SELECT COUNT(*) as proc FROM orders WHERE status='processing'", (err, pr) => {
+                        db.get("SELECT COUNT(*) as ready FROM orders WHERE status='ready'", (err, r) => {
+                            db.get("SELECT COUNT(*) as delivered FROM orders WHERE status='delivered'", (err, d) => {
+                                db.get("SELECT COALESCE(SUM(total),0) as rev FROM orders WHERE status='delivered'", (err, rev) => {
+                                    let message = `📊 СТАТИСТИКА\n\n📦 Товаров: ${p?.products || 0}\n🆕 Новых: ${n?.new || 0}\n⚙️ В сборке: ${pr?.proc || 0}\n✅ Готовых: ${r?.ready || 0}\n📦 Выдано: ${d?.delivered || 0}\n💰 Выручка: ${(rev?.rev || 0).toLocaleString()} сом`;
+                                    sendToTelegram(chatId, message);
+                                });
+                            });
+                        });
+                    });
+                });
+            });
+        }
+        else if (text === '👥 СОТРУДНИКИ' && isAdmin) {
+            db.all("SELECT * FROM telegram_users ORDER BY role DESC, is_active DESC", (err, users) => {
+                let message = '👥 СОТРУДНИКИ\n\n';
+                for (const u of users) {
+                    const status = u.is_active ? '✅' : '❌';
+                    const role = u.role === 'admin' ? '👑 Админ' : '👤 Сборщик';
+                    const name = u.first_name || u.username || 'Без имени';
+                    message += `${status} ${role}: ${name}\n🆔 ${u.chat_id}\n\n`;
+                }
+                message += `/adduser ID - добавить\n/removeuser ID - удалить`;
+                sendToTelegram(chatId, message);
+            });
+        }
+        else if (text === '📋 ЗАЯВКИ' && isAdmin) {
+            db.all("SELECT * FROM callbacks ORDER BY created_at DESC LIMIT 20", async (err, callbacks) => {
+                if (!callbacks || callbacks.length === 0) {
+                    return sendToTelegram(chatId, '📭 Нет заявок');
+                }
+                
+                for (const cb of callbacks) {
+                    const statusIcon = cb.status === 'new' ? '🆕' : '✅';
+                    let message = `${statusIcon} ЗАЯВКА #${cb.id}\n`;
+                    message += `👤 Имя: ${cb.name}\n`;
+                    message += `📞 Телефон: ${cb.phone}\n`;
+                    if (cb.question) message += `💬 Вопрос: ${cb.question}\n`;
+                    message += `📅 ${new Date(cb.created_at).toLocaleString('ru-RU')}\n`;
+                    message += `📊 Статус: ${cb.status === 'new' ? 'НОВАЯ' : 'ОБРАБОТАНА'}`;
+                    
+                    const buttons = [];
+                    if (cb.status === 'new') {
+                        buttons.push([{ text: '✅ ОТМЕТИТЬ ОБРАБОТАННОЙ', callback_data: `callback_done_${cb.id}` }]);
+                    }
+                    
+                    await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
+                }
+            });
+        }
+    });
+    
+    bot.on('callback_query', async (query) => {
+        const chatId = query.message.chat.id;
+        const data = query.data;
+        
+        const user = await getUser(chatId);
+        if (!user) return bot.answerCallbackQuery(query.id, { text: '⛔ Нет доступа', show_alert: true });
+        
+        const isAdmin = user.role === 'admin';
+        const parts = data.split('_');
+        const action = parts[0];
+        
+        if (action === 'callback_done') {
+            if (!isAdmin) return bot.answerCallbackQuery(query.id, { text: '⛔ Только админ', show_alert: true });
+            const callbackId = parseInt(parts[2]);
+            
+            db.run("UPDATE callbacks SET status = 'done' WHERE id = ?", [callbackId], async (err) => {
+                if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
+                await bot.answerCallbackQuery(query.id, { text: '✅ Заявка отмечена как обработанная!' });
+                
+                const newText = query.message.text.replace('🆕', '✅').replace('НОВАЯ', 'ОБРАБОТАНА');
+                await bot.editMessageText(newText, { 
+                    chat_id: chatId, 
+                    message_id: query.message.message_id,
+                    reply_markup: { inline_keyboard: [] }
+                }).catch(() => {});
+            });
+            return;
+        }
+        
+        const orderId = parseInt(parts[1]);
+        const order = await getOrderById(orderId);
+        if (!order) return bot.answerCallbackQuery(query.id, { text: '❌ Заказ не найден' });
+        
+        if (action === 'take') {
+            if (order.assigned_to && order.assigned_to !== String(chatId)) {
+                return bot.answerCallbackQuery(query.id, { text: '⚠️ Занят другим', show_alert: true });
+            }
+            db.run("UPDATE orders SET assigned_to = ? WHERE id = ?", [String(chatId), orderId], async (err) => {
+                if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
+                await bot.answerCallbackQuery(query.id, { text: '✅ Заказ взят!' });
+                const updatedOrder = await getOrderById(orderId);
+                const newMessage = formatOrderMessage(updatedOrder);
+                const buttons = [[{ text: '✅ ПОДТВЕРДИТЬ', callback_data: `confirm_${orderId}` }]];
+                await bot.editMessageText(newMessage, { chat_id: chatId, message_id: query.message.message_id, reply_markup: { inline_keyboard: buttons } }).catch(() => {});
+                sendToTelegram(ADMIN_CHAT_ID, `👤 Сотрудник взял заказ #${order.order_number}\n👤 ${order.customer_name}\n💰 ${order.total.toLocaleString()} сом`);
+            });
+        }
+        else if (action === 'confirm') {
+            if (order.assigned_to !== String(chatId)) return bot.answerCallbackQuery(query.id, { text: '⛔ Не ваш заказ', show_alert: true });
+            const now = new Date().toISOString();
+            db.run("UPDATE orders SET status = 'processing', confirmed_at = ? WHERE id = ?", [now, orderId], async (err) => {
+                if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
+                await bot.answerCallbackQuery(query.id, { text: '⚙️ В сборке!' });
+                const updatedOrder = await getOrderById(orderId);
+                const newMessage = formatOrderMessage(updatedOrder);
+                const buttons = [[{ text: '📦 ГОТОВ', callback_data: `ready_${orderId}` }]];
+                await bot.editMessageText(newMessage, { chat_id: chatId, message_id: query.message.message_id, reply_markup: { inline_keyboard: buttons } }).catch(() => {});
+                sendToTelegram(ADMIN_CHAT_ID, `⚙️ Заказ #${order.order_number} в сборке\n👤 ${order.customer_name}`);
+            });
+        }
+        else if (action === 'ready') {
+            if (order.assigned_to !== String(chatId)) return bot.answerCallbackQuery(query.id, { text: '⛔ Не ваш заказ', show_alert: true });
+            const now = new Date().toISOString();
+            db.run("UPDATE orders SET status = 'ready', ready_at = ? WHERE id = ?", [now, orderId], async (err) => {
+                if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
+                await bot.answerCallbackQuery(query.id, { text: '✅ Заказ готов!' });
+                const updatedOrder = await getOrderById(orderId);
+                const newMessage = formatOrderMessage(updatedOrder);
+                await bot.editMessageText(newMessage, { chat_id: chatId, message_id: query.message.message_id }).catch(() => {});
+                sendToTelegram(ADMIN_CHAT_ID, `✅ ЗАКАЗ ГОТОВ!\n📦 #${order.order_number}\n👤 ${order.customer_name}\n📞 ${order.customer_phone}\n💰 ${order.total.toLocaleString()} сом`);
+            });
+        }
+        else if (action === 'deliver') {
+            if (!isAdmin) return bot.answerCallbackQuery(query.id, { text: '⛔ Только админ', show_alert: true });
+            const now = new Date().toISOString();
+            db.run("UPDATE orders SET status = 'delivered', delivered_at = ? WHERE id = ?", [now, orderId], async (err) => {
+                if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
+                await bot.answerCallbackQuery(query.id, { text: '✅ Заказ выдан!' });
+                const updatedOrder = await getOrderById(orderId);
+                const newMessage = formatOrderMessage(updatedOrder);
+                await bot.editMessageText(newMessage + '\n\n✅ ЗАКАЗ ВЫДАН', { chat_id: chatId, message_id: query.message.message_id }).catch(() => {});
+                if (order.assigned_to) sendToTelegram(order.assigned_to, `🎉 Заказ #${order.order_number} ВЫДАН!`);
+            });
+        }
+        else if (action === 'cancel') {
+            if (!isAdmin) return bot.answerCallbackQuery(query.id, { text: '⛔ Только админ', show_alert: true });
+            db.run("UPDATE orders SET status = 'cancelled' WHERE id = ?", [orderId], async (err) => {
+                if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
+                await bot.answerCallbackQuery(query.id, { text: '❌ Заказ отменён' });
+                const updatedOrder = await getOrderById(orderId);
+                const newMessage = formatOrderMessage(updatedOrder);
+                await bot.editMessageText(newMessage + '\n\n❌ ЗАКАЗ ОТМЕНЁН', { chat_id: chatId, message_id: query.message.message_id }).catch(() => {});
+                if (order.assigned_to) sendToTelegram(order.assigned_to, `❌ Заказ #${order.order_number} отменён`);
+            });
+        }
+        
+        bot.answerCallbackQuery(query.id);
+    });
+    
+    bot.onText(/\/adduser (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const user = await getUser(chatId);
+        if (!user || user.role !== 'admin') return sendToTelegram(chatId, '⛔ Только администратор');
+        
+        const newChatId = match[1].trim();
+        db.get("SELECT id FROM telegram_users WHERE chat_id = ?", [newChatId], (err, existing) => {
+            if (existing) {
+                db.run("UPDATE telegram_users SET is_active = 1, role = 'staff' WHERE chat_id = ?", [newChatId], () => {
+                    sendToTelegram(chatId, '✅ Сотрудник активирован!');
+                    sendToTelegram(newChatId, '🎉 Вас добавили в ТЕПЛОСИЛА!\nНажмите /start');
+                });
+            } else {
+                db.run("INSERT INTO telegram_users (chat_id, role, is_active, first_name) VALUES (?, 'staff', 1, 'Сотрудник')", [newChatId], () => {
+                    sendToTelegram(chatId, '✅ Сотрудник добавлен!');
+                    sendToTelegram(newChatId, '🎉 Вас добавили в ТЕПЛОСИЛА!\nНажмите /start');
+                });
+            }
+        });
+    });
+    
+    bot.onText(/\/removeuser (.+)/, async (msg, match) => {
+        const chatId = msg.chat.id;
+        const user = await getUser(chatId);
+        if (!user || user.role !== 'admin') return sendToTelegram(chatId, '⛔ Только администратор');
+        
+        const removeChatId = match[1].trim();
+        db.run("UPDATE telegram_users SET is_active = 0 WHERE chat_id = ?", [removeChatId], function(err) {
+            if (err || this.changes === 0) return sendToTelegram(chatId, '❌ Сотрудник не найден');
+            sendToTelegram(chatId, '✅ Сотрудник удалён');
+            sendToTelegram(removeChatId, '❌ Ваш доступ отозван');
+        });
+    });
+}
 
+// Вспомогательные функции для бота
 async function sendToTelegram(chatId, message, options = {}) {
+    if (!bot) return null;
     try {
         const result = await bot.sendMessage(chatId, message, { parse_mode: 'Markdown', ...options });
         return result;
@@ -240,286 +576,6 @@ function formatOrderMessage(order) {
     
     return message;
 }
-
-bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    console.log(`📱 /start от ${chatId}`);
-    
-    await registerUser(chatId, msg.chat.username, msg.chat.first_name, msg.chat.last_name);
-    const user = await getUser(chatId);
-    
-    if (!user) {
-        return sendToTelegram(chatId, `⛔ Нет доступа\nВаш ID: ${chatId}\nПередайте ID администратору.`);
-    }
-    
-    const isAdmin = user.role === 'admin';
-    const name = user.first_name || 'пользователь';
-    
-    const keyboard = isAdmin ? [
-        [{ text: '📋 ВСЕ ЗАКАЗЫ' }],
-        [{ text: '✅ ГОТОВЫ К ВЫДАЧЕ' }],
-        [{ text: '📊 СТАТИСТИКА' }, { text: '👥 СОТРУДНИКИ' }],
-        [{ text: '📋 ЗАЯВКИ' }]
-    ] : [
-        [{ text: '📋 ДОСТУПНЫЕ ЗАКАЗЫ' }],
-        [{ text: '👤 МОИ ЗАКАЗЫ' }]
-    ];
-    
-    sendToTelegram(chatId, `👋 Добро пожаловать, ${name}!`, {
-        reply_markup: { keyboard, resize_keyboard: true }
-    });
-});
-
-bot.on('message', async (msg) => {
-    if (msg.text && msg.text.startsWith('/')) return;
-    
-    const chatId = msg.chat.id;
-    const text = msg.text;
-    if (!text) return;
-    
-    const user = await getUser(chatId);
-    if (!user) return;
-    
-    const isAdmin = user.role === 'admin';
-    
-    if (text === '📋 ДОСТУПНЫЕ ЗАКАЗЫ' && !isAdmin) {
-        db.all("SELECT * FROM orders WHERE status IN ('new', 'processing') AND (assigned_to IS NULL OR assigned_to = ?) ORDER BY created_at DESC LIMIT 10", [String(chatId)], async (err, orders) => {
-            if (!orders || orders.length === 0) return sendToTelegram(chatId, '📭 Нет доступных заказов');
-            sendToTelegram(chatId, `📋 ДОСТУПНЫЕ ЗАКАЗЫ (${orders.length})`);
-            for (const order of orders) {
-                const message = formatOrderMessage(order);
-                const buttons = [];
-                if (order.status === 'new' && !order.assigned_to) buttons.push([{ text: '👤 ВЗЯТЬ', callback_data: `take_${order.id}` }]);
-                else if (order.status === 'new' && order.assigned_to === String(chatId)) buttons.push([{ text: '✅ ПОДТВЕРДИТЬ', callback_data: `confirm_${order.id}` }]);
-                else if (order.status === 'processing' && order.assigned_to === String(chatId)) buttons.push([{ text: '📦 ГОТОВ', callback_data: `ready_${order.id}` }]);
-                await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
-            }
-        });
-    }
-    else if (text === '👤 МОИ ЗАКАЗЫ' && !isAdmin) {
-        db.all("SELECT * FROM orders WHERE assigned_to = ? AND status IN ('new', 'processing', 'ready') ORDER BY created_at DESC", [String(chatId)], async (err, orders) => {
-            if (!orders || orders.length === 0) return sendToTelegram(chatId, '📭 У вас нет активных заказов');
-            sendToTelegram(chatId, `👤 ВАШИ ЗАКАЗЫ (${orders.length})`);
-            for (const order of orders) {
-                const message = formatOrderMessage(order);
-                const buttons = [];
-                if (order.status === 'new') buttons.push([{ text: '✅ ПОДТВЕРДИТЬ', callback_data: `confirm_${order.id}` }]);
-                else if (order.status === 'processing') buttons.push([{ text: '📦 ГОТОВ', callback_data: `ready_${order.id}` }]);
-                await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
-            }
-        });
-    }
-    else if (text === '📋 ВСЕ ЗАКАЗЫ' && isAdmin) {
-        db.all("SELECT * FROM orders WHERE status IN ('new', 'processing', 'ready') ORDER BY created_at DESC LIMIT 20", async (err, orders) => {
-            if (!orders || orders.length === 0) return sendToTelegram(chatId, '📭 Нет активных заказов');
-            sendToTelegram(chatId, `📋 ВСЕ АКТИВНЫЕ ЗАКАЗЫ (${orders.length})`);
-            for (const order of orders) {
-                const message = formatOrderMessage(order);
-                const buttons = [];
-                if (order.status === 'ready') buttons.push([{ text: '✅ ВЫДАТЬ', callback_data: `deliver_${order.id}` }]);
-                if (order.status !== 'delivered' && order.status !== 'cancelled') buttons.push([{ text: '❌ ОТМЕНИТЬ', callback_data: `cancel_${order.id}` }]);
-                await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
-            }
-        });
-    }
-    else if (text === '✅ ГОТОВЫ К ВЫДАЧЕ' && isAdmin) {
-        db.all("SELECT * FROM orders WHERE status = 'ready' ORDER BY ready_at ASC", async (err, orders) => {
-            if (!orders || orders.length === 0) return sendToTelegram(chatId, '✅ Нет готовых заказов');
-            sendToTelegram(chatId, `✅ ГОТОВЫ К ВЫДАЧЕ (${orders.length})`);
-            for (const order of orders) {
-                const message = formatOrderMessage(order);
-                const buttons = [[{ text: '✅ ВЫДАТЬ', callback_data: `deliver_${order.id}` }], [{ text: '❌ ОТМЕНИТЬ', callback_data: `cancel_${order.id}` }]];
-                await sendToTelegram(chatId, message, { reply_markup: { inline_keyboard: buttons } });
-            }
-        });
-    }
-    else if (text === '📊 СТАТИСТИКА' && isAdmin) {
-        db.get("SELECT COUNT(*) as products FROM products", (err, p) => {
-            db.get("SELECT COUNT(*) as new FROM orders WHERE status='new'", (err, n) => {
-                db.get("SELECT COUNT(*) as proc FROM orders WHERE status='processing'", (err, pr) => {
-                    db.get("SELECT COUNT(*) as ready FROM orders WHERE status='ready'", (err, r) => {
-                        db.get("SELECT COUNT(*) as delivered FROM orders WHERE status='delivered'", (err, d) => {
-                            db.get("SELECT COALESCE(SUM(total),0) as rev FROM orders WHERE status='delivered'", (err, rev) => {
-                                let message = `📊 СТАТИСТИКА\n\n📦 Товаров: ${p?.products || 0}\n🆕 Новых: ${n?.new || 0}\n⚙️ В сборке: ${pr?.proc || 0}\n✅ Готовых: ${r?.ready || 0}\n📦 Выдано: ${d?.delivered || 0}\n💰 Выручка: ${(rev?.rev || 0).toLocaleString()} сом`;
-                                sendToTelegram(chatId, message);
-                            });
-                        });
-                    });
-                });
-            });
-        });
-    }
-    else if (text === '👥 СОТРУДНИКИ' && isAdmin) {
-        db.all("SELECT * FROM telegram_users ORDER BY role DESC, is_active DESC", (err, users) => {
-            let message = '👥 СОТРУДНИКИ\n\n';
-            for (const u of users) {
-                const status = u.is_active ? '✅' : '❌';
-                const role = u.role === 'admin' ? '👑 Админ' : '👤 Сборщик';
-                const name = u.first_name || u.username || 'Без имени';
-                message += `${status} ${role}: ${name}\n🆔 ${u.chat_id}\n\n`;
-            }
-            message += `/adduser ID - добавить\n/removeuser ID - удалить`;
-            sendToTelegram(chatId, message);
-        });
-    }
-    else if (text === '📋 ЗАЯВКИ' && isAdmin) {
-        db.all("SELECT * FROM callbacks ORDER BY created_at DESC LIMIT 20", async (err, callbacks) => {
-            if (!callbacks || callbacks.length === 0) {
-                return sendToTelegram(chatId, '📭 Нет заявок');
-            }
-            
-            for (const cb of callbacks) {
-                const statusIcon = cb.status === 'new' ? '🆕' : '✅';
-                let message = `${statusIcon} ЗАЯВКА #${cb.id}\n`;
-                message += `👤 Имя: ${cb.name}\n`;
-                message += `📞 Телефон: ${cb.phone}\n`;
-                if (cb.question) message += `💬 Вопрос: ${cb.question}\n`;
-                message += `📅 ${new Date(cb.created_at).toLocaleString('ru-RU')}\n`;
-                message += `📊 Статус: ${cb.status === 'new' ? 'НОВАЯ' : 'ОБРАБОТАНА'}`;
-                
-                const buttons = [];
-                if (cb.status === 'new') {
-                    buttons.push([{ text: '✅ ОТМЕТИТЬ ОБРАБОТАННОЙ', callback_data: `callback_done_${cb.id}` }]);
-                }
-                
-                await sendToTelegram(chatId, message, buttons.length ? { reply_markup: { inline_keyboard: buttons } } : {});
-            }
-        });
-    }
-});
-
-bot.on('callback_query', async (query) => {
-    const chatId = query.message.chat.id;
-    const data = query.data;
-    
-    const user = await getUser(chatId);
-    if (!user) return bot.answerCallbackQuery(query.id, { text: '⛔ Нет доступа', show_alert: true });
-    
-    const isAdmin = user.role === 'admin';
-    const parts = data.split('_');
-    const action = parts[0];
-    
-    if (action === 'callback_done') {
-        if (!isAdmin) return bot.answerCallbackQuery(query.id, { text: '⛔ Только админ', show_alert: true });
-        const callbackId = parseInt(parts[2]);
-        
-        db.run("UPDATE callbacks SET status = 'done' WHERE id = ?", [callbackId], async (err) => {
-            if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
-            await bot.answerCallbackQuery(query.id, { text: '✅ Заявка отмечена как обработанная!' });
-            
-            const newText = query.message.text.replace('🆕', '✅').replace('НОВАЯ', 'ОБРАБОТАНА');
-            await bot.editMessageText(newText, { 
-                chat_id: chatId, 
-                message_id: query.message.message_id,
-                reply_markup: { inline_keyboard: [] }
-            }).catch(() => {});
-        });
-        return;
-    }
-    
-    const orderId = parseInt(parts[1]);
-    const order = await getOrderById(orderId);
-    if (!order) return bot.answerCallbackQuery(query.id, { text: '❌ Заказ не найден' });
-    
-    if (action === 'take') {
-        if (order.assigned_to && order.assigned_to !== String(chatId)) {
-            return bot.answerCallbackQuery(query.id, { text: '⚠️ Занят другим', show_alert: true });
-        }
-        db.run("UPDATE orders SET assigned_to = ? WHERE id = ?", [String(chatId), orderId], async (err) => {
-            if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
-            await bot.answerCallbackQuery(query.id, { text: '✅ Заказ взят!' });
-            const updatedOrder = await getOrderById(orderId);
-            const newMessage = formatOrderMessage(updatedOrder);
-            const buttons = [[{ text: '✅ ПОДТВЕРДИТЬ', callback_data: `confirm_${orderId}` }]];
-            await bot.editMessageText(newMessage, { chat_id: chatId, message_id: query.message.message_id, reply_markup: { inline_keyboard: buttons } }).catch(() => {});
-            sendToTelegram(ADMIN_CHAT_ID, `👤 Сотрудник взял заказ #${order.order_number}\n👤 ${order.customer_name}\n💰 ${order.total.toLocaleString()} сом`);
-        });
-    }
-    else if (action === 'confirm') {
-        if (order.assigned_to !== String(chatId)) return bot.answerCallbackQuery(query.id, { text: '⛔ Не ваш заказ', show_alert: true });
-        const now = new Date().toISOString();
-        db.run("UPDATE orders SET status = 'processing', confirmed_at = ? WHERE id = ?", [now, orderId], async (err) => {
-            if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
-            await bot.answerCallbackQuery(query.id, { text: '⚙️ В сборке!' });
-            const updatedOrder = await getOrderById(orderId);
-            const newMessage = formatOrderMessage(updatedOrder);
-            const buttons = [[{ text: '📦 ГОТОВ', callback_data: `ready_${orderId}` }]];
-            await bot.editMessageText(newMessage, { chat_id: chatId, message_id: query.message.message_id, reply_markup: { inline_keyboard: buttons } }).catch(() => {});
-            sendToTelegram(ADMIN_CHAT_ID, `⚙️ Заказ #${order.order_number} в сборке\n👤 ${order.customer_name}`);
-        });
-    }
-    else if (action === 'ready') {
-        if (order.assigned_to !== String(chatId)) return bot.answerCallbackQuery(query.id, { text: '⛔ Не ваш заказ', show_alert: true });
-        const now = new Date().toISOString();
-        db.run("UPDATE orders SET status = 'ready', ready_at = ? WHERE id = ?", [now, orderId], async (err) => {
-            if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
-            await bot.answerCallbackQuery(query.id, { text: '✅ Заказ готов!' });
-            const updatedOrder = await getOrderById(orderId);
-            const newMessage = formatOrderMessage(updatedOrder);
-            await bot.editMessageText(newMessage, { chat_id: chatId, message_id: query.message.message_id }).catch(() => {});
-            sendToTelegram(ADMIN_CHAT_ID, `✅ ЗАКАЗ ГОТОВ!\n📦 #${order.order_number}\n👤 ${order.customer_name}\n📞 ${order.customer_phone}\n💰 ${order.total.toLocaleString()} сом`);
-        });
-    }
-    else if (action === 'deliver') {
-        if (!isAdmin) return bot.answerCallbackQuery(query.id, { text: '⛔ Только админ', show_alert: true });
-        const now = new Date().toISOString();
-        db.run("UPDATE orders SET status = 'delivered', delivered_at = ? WHERE id = ?", [now, orderId], async (err) => {
-            if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
-            await bot.answerCallbackQuery(query.id, { text: '✅ Заказ выдан!' });
-            const updatedOrder = await getOrderById(orderId);
-            const newMessage = formatOrderMessage(updatedOrder);
-            await bot.editMessageText(newMessage + '\n\n✅ ЗАКАЗ ВЫДАН', { chat_id: chatId, message_id: query.message.message_id }).catch(() => {});
-            if (order.assigned_to) sendToTelegram(order.assigned_to, `🎉 Заказ #${order.order_number} ВЫДАН!`);
-        });
-    }
-    else if (action === 'cancel') {
-        if (!isAdmin) return bot.answerCallbackQuery(query.id, { text: '⛔ Только админ', show_alert: true });
-        db.run("UPDATE orders SET status = 'cancelled' WHERE id = ?", [orderId], async (err) => {
-            if (err) return bot.answerCallbackQuery(query.id, { text: '❌ Ошибка' });
-            await bot.answerCallbackQuery(query.id, { text: '❌ Заказ отменён' });
-            const updatedOrder = await getOrderById(orderId);
-            const newMessage = formatOrderMessage(updatedOrder);
-            await bot.editMessageText(newMessage + '\n\n❌ ЗАКАЗ ОТМЕНЁН', { chat_id: chatId, message_id: query.message.message_id }).catch(() => {});
-            if (order.assigned_to) sendToTelegram(order.assigned_to, `❌ Заказ #${order.order_number} отменён`);
-        });
-    }
-    
-    bot.answerCallbackQuery(query.id);
-});
-
-bot.onText(/\/adduser (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const user = await getUser(chatId);
-    if (!user || user.role !== 'admin') return sendToTelegram(chatId, '⛔ Только администратор');
-    
-    const newChatId = match[1].trim();
-    db.get("SELECT id FROM telegram_users WHERE chat_id = ?", [newChatId], (err, existing) => {
-        if (existing) {
-            db.run("UPDATE telegram_users SET is_active = 1, role = 'staff' WHERE chat_id = ?", [newChatId], () => {
-                sendToTelegram(chatId, '✅ Сотрудник активирован!');
-                sendToTelegram(newChatId, '🎉 Вас добавили в ТЕПЛОСИЛА!\nНажмите /start');
-            });
-        } else {
-            db.run("INSERT INTO telegram_users (chat_id, role, is_active, first_name) VALUES (?, 'staff', 1, 'Сотрудник')", [newChatId], () => {
-                sendToTelegram(chatId, '✅ Сотрудник добавлен!');
-                sendToTelegram(newChatId, '🎉 Вас добавили в ТЕПЛОСИЛА!\nНажмите /start');
-            });
-        }
-    });
-});
-
-bot.onText(/\/removeuser (.+)/, async (msg, match) => {
-    const chatId = msg.chat.id;
-    const user = await getUser(chatId);
-    if (!user || user.role !== 'admin') return sendToTelegram(chatId, '⛔ Только администратор');
-    
-    const removeChatId = match[1].trim();
-    db.run("UPDATE telegram_users SET is_active = 0 WHERE chat_id = ?", [removeChatId], function(err) {
-        if (err || this.changes === 0) return sendToTelegram(chatId, '❌ Сотрудник не найден');
-        sendToTelegram(chatId, '✅ Сотрудник удалён');
-        sendToTelegram(removeChatId, '❌ Ваш доступ отозван');
-    });
-});
 
 // ===== API РОУТЫ =====
 app.get('/api/products', (req, res) => {
@@ -829,7 +885,9 @@ app.post('/api/callback', async (req, res) => {
 
 // ===== ЗАПУСК =====
 const localIp = getLocalIp();
-app.listen(PORT, '0.0.0.0', () => {
+
+// Запускаем сервер
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n${'='.repeat(50)}`);
     console.log(`🚀 СЕРВЕР ЗАПУЩЕН!`);
     console.log(`${'='.repeat(50)}`);
@@ -837,9 +895,22 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`📱 На телефоне: http://${localIp}:${PORT}`);
     console.log(`🔑 Админка: http://localhost:${PORT}/admin-login.html`);
     console.log(`💾 База: teplosila.db`);
+    console.log(`🩺 Health check: http://localhost:${PORT}/health`);
     console.log(`${'='.repeat(50)}`);
 });
 
-setTimeout(async () => {
-    await sendToTelegram(ADMIN_CHAT_ID, '✅ Сервер запущен! Бот готов к работе.');
-}, 3000);
+// Запускаем бота после запуска сервера
+setTimeout(() => {
+    initBot();
+}, 2000);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('Получен SIGTERM, закрываем соединения...');
+    server.close(() => {
+        console.log('Сервер остановлен');
+        if (bot) bot.stopPolling();
+        db.close();
+        process.exit(0);
+    });
+});
