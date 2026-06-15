@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // ===== НАСТРОЙКИ =====
 const TELEGRAM_TOKEN = '8564447444:AAGL_DfOSI6gLvWo27Rq5_w20QRf0r6Yi9Q';
