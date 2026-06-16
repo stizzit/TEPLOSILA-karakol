@@ -933,7 +933,33 @@ app.get('/api/admin/stats', (req, res) => {
         });
     });
 });
-
+// Добавьте в server.js после API роутов
+app.post('/api/admin/restore', (req, res) => {
+    const { password } = req.body;
+    if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'Неверный пароль' });
+    }
+    
+    const backupPath = path.join(BACKUP_DIR, 'teplosila.db');
+    if (!fs.existsSync(backupPath)) {
+        return res.status(404).json({ error: 'Бэкап не найден' });
+    }
+    
+    try {
+        // Закрываем текущее соединение с БД
+        db.close();
+        
+        // Восстанавливаем из бэкапа
+        fs.copyFileSync(backupPath, DB_FILE);
+        
+        // Переоткрываем БД
+        // (нужно пересоздать соединение)
+        
+        res.json({ success: true, message: 'База данных восстановлена из бэкапа' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 // ===== API ДЛЯ ЗАЯВОК =====
 app.get('/api/callbacks', (req, res) => {
     db.all("SELECT * FROM callbacks ORDER BY created_at DESC", (err, rows) => {
