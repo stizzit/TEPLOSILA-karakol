@@ -1,3 +1,44 @@
+# ===== ЗАВИСИМОСТИ =====
 node_modules/
-teplosila.db-shm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===== БАЗА ДАННЫХ (игнорируем, чтобы не загружать в GitHub) =====
+teplosila.db
 teplosila.db-wal
+teplosila.db-shm
+teplosila.db-journal
+
+# ===== ВРЕМЕННЫЕ ФАЙЛЫ =====
+uploads/
+tmp/
+temp/
+*.tmp
+
+# ===== СИСТЕМНЫЕ ФАЙЛЫ =====
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== ЛОГИ =====
+*.log
+logs/
+*.log
+
+# ===== ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ =====
+.env
+.env.local
+.env.*.local
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ===== БЭКАПЫ (НЕ игнорируем!) =====
+# Важно: папка backup должна сохраняться в репозитории
+!backup/
+!backup/.gitkeep
