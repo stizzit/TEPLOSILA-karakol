@@ -5,7 +5,106 @@ const TelegramBot = require('node-telegram-bot-api');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
+const { exec } = require('child_process');
 
+// ===== АВТОМАТИЧЕСКИЙ БЭКАП В GITHUB =====
+const BACKUP_INTERVAL = 5 * 60 * 1000; // 5 минут
+const DB_FILE = './teplosila.db';
+const BACKUP_DIR = './backup';
+
+// Создаём папку для бэкапов
+if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR);
+}
+
+// Функция бэкапа
+function backupDatabase() {
+    try {
+        // Проверяем, существует ли БД
+        if (!fs.existsSync(DB_FILE)) {
+            console.log('⚠️ База данных не найдена, пропускаем бэкап');
+            return;
+        }
+
+        // Копируем файл БД в папку бэкапа
+        const backupPath = path.join(BACKUP_DIR, 'teplosila.db');
+        fs.copyFileSync(DB_FILE, backupPath);
+        
+        // Копируем также файл WAL (журнал)
+        const walFile = DB_FILE + '-wal';
+        if (fs.existsSync(walFile)) {
+            fs.copyFileSync(walFile, path.join(BACKUP_DIR, 'teplosila.db-wal'));
+        }
+        
+        console.log(`✅ Бэкап создан: ${new Date().toLocaleString()}`);
+        
+        // Отправляем в GitHub (если настроен)
+        commitAndPush();
+        
+    } catch (err) {
+        console.error('❌ Ошибка бэкапа:', err.message);
+    }
+}
+
+// Функция отправки в GitHub
+function commitAndPush() {
+    exec('cd ' + __dirname + ' && git add backup/ && git commit -m "Auto backup: ' + new Date().toISOString() + '" && git push', 
+        (error, stdout, stderr) => {
+            if (error) {
+                console.log('⚠️ GitHub push:', error.message);
+                return;
+            }
+            console.log('📤 Бэкап отправлен в GitHub');
+        }
+    );
+}
+
+// Функция восстановления бэкапа при запуске
+function restoreBackup() {
+    const backupPath = path.join(BACKUP_DIR, 'teplosila.db');
+    
+    // Проверяем, существует ли бэкап и отсутствует ли основная БД
+    if (fs.existsSync(backupPath) && !fs.existsSync(DB_FILE)) {
+        try {
+            fs.copyFileSync(backupPath, DB_FILE);
+            console.log('✅ База данных восстановлена из бэкапа');
+            
+            // Восстанавливаем WAL файл
+            const walBackup = path.join(BACKUP_DIR, 'teplosila.db-wal');
+            if (fs.existsSync(walBackup)) {
+                fs.copyFileSync(walBackup, DB_FILE + '-wal');
+            }
+        } catch (err) {
+            console.error('❌ Ошибка восстановления:', err.message);
+        }
+    } else if (!fs.existsSync(backupPath) && !fs.existsSync(DB_FILE)) {
+        console.log('⚠️ Нет бэкапа и нет базы данных. Будет создана новая.');
+    } else if (fs.existsSync(DB_FILE)) {
+        console.log('✅ База данных уже существует, бэкап не требуется');
+    }
+}
+
+// Запускаем восстановление при старте
+restoreBackup();
+
+// Запускаем автоматический бэкап
+setInterval(backupDatabase, BACKUP_INTERVAL);
+
+// Также делаем бэкап при завершении сервера
+process.on('SIGTERM', () => {
+    console.log('Получен SIGTERM, делаем финальный бэкап...');
+    backupDatabase();
+    setTimeout(() => process.exit(0), 2000);
+});
+
+process.on('SIGINT', () => {
+    console.log('Получен SIGINT, делаем финальный бэкап...');
+    backupDatabase();
+    setTimeout(() => process.exit(0), 2000);
+});
+
+// ===== КОНЕЦ БЛОКА БЭКАПА =====
 const app = express();
 const PORT = process.env.PORT || 3000;
 
