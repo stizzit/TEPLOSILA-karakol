@@ -15,3 +15,9 @@
     "multer": "^1.4.5-lts.1"
   }
 }
+{
+  "scripts": {
+    "start": "node server.js",
+    "backup": "git add backup/ && git commit -m 'Manual backup' && git push"
+  }
+}
